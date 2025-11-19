@@ -54,15 +54,14 @@ export class App {
   // Register all plugins and middleware
   public async initialize() {
     try {
-      
-        await this.app.register(helmet, {
+      await this.app.register(helmet, {
         contentSecurityPolicy: false,
       });
 
       await this.app.register(cors, {
-        origin: '*',
+        origin: "*",
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       });
 
       await this.app.register(compress, {
@@ -70,12 +69,12 @@ export class App {
       });
 
       await this.app.register(cookie, {
-        secret: DOT_ENV.COOKIE_SECRET || 'my-secret-key',
+        secret: DOT_ENV.COOKIE_SECRET || "my-secret-key",
       });
 
       await this.app.register(rateLimit, {
         max: 50, // Max requests
-        timeWindow: '1 minute', // Per minute
+        timeWindow: "1 minute", // Per minute
         redis: this.redis, // Redis for distributed rate limiting
       });
 
@@ -85,21 +84,21 @@ export class App {
         },
       });
 
-      this.app.decorate('db', this.db);
-      this.app.decorate('redis', this.redis);
+      this.app.decorate("db", this.db);
+      this.app.decorate("redis", this.redis);
 
       // Global hooks
       this.registerHooks();
 
+      // register custom error handler
+      this.registerErrorHandler();
+
       // Routes
       await this.registerRoutes();
 
-      // Error handler
-      this.registerErrorHandler();
-
-      console.log('Fastify app initialized successfully');
+      console.log("Fastify app initialized successfully");
     } catch (err) {
-      console.error('Error during initialization:', err);
+      console.error("Error during initialization:", err);
       throw err;
     }
   }
@@ -129,6 +128,7 @@ export class App {
 
   // Error handler 
   private registerErrorHandler() {
+    console.log('Registering custom error handler');
     this.app.setErrorHandler(errorHandler);
   }
 
