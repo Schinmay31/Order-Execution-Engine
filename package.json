@@ -1,0 +1,53 @@
+{
+  "name": "dex-exchange",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "npx jest --coverage --detectOpenHandles",
+    "test:watch": "npx jest --watch",
+    "lint": "npx eslint src/**/*.ts",
+    "lint:fix": "npx eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "seed": "ts-node scripts/seed.ts",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f api"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/compress": "^8.3.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/formbody": "^8.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/postgres": "^6.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.2.0",
+    "cls-hooked": "^4.2.2",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.2",
+    "fastify-compress": "^4.1.0",
+    "fastify-cookie": "^5.7.0",
+    "fastify-cors": "^6.1.0",
+    "fastify-helmet": "^7.1.0",
+    "fastify-rate-limit": "^5.9.0",
+    "ioredis": "^5.8.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/cls-hooked": "^4.3.9",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "i": "^0.3.7",
+    "npm": "^11.6.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
