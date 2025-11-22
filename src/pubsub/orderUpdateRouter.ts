@@ -15,6 +15,10 @@ class OrderUpdateRouter extends EventEmitter {
   sendUpdate(orderId: string, update: any) {
     const ws = this.clientMap.get(orderId);
     if (ws && ws.readyState === 1) {
+      if (update.status === "confirmed" || update.status === "failed") {
+        // unregister after final update
+        this.unregister(orderId);
+      }
       ws.send(JSON.stringify(update));
     }
   }
