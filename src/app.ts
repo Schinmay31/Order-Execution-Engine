@@ -5,15 +5,15 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
 import cookie from '@fastify/cookie';
-import websocket from '@fastify/websocket';
-import { Pool } from 'pg';
-import Redis from 'ioredis';
-import DOT_ENV from './config-env';
-import { routes } from './routes/index';
-import { errorHandler } from './middleware/errorHandler.middleware';
+import websocket from "@fastify/websocket";
+import Redis from "ioredis";
+import DOT_ENV from "./config-env";
+import { routes } from "./routes/index";
+import { errorHandler } from "./middleware/errorHandler.middleware";
 // import { authMiddleware } from './middleware/auth.middleware';
-import { connectToDB } from './config/database.connection';
+import { connectToDB, sequelize } from "./config/database.connection";
 import { redisConnection } from "./config/redis.connection";
+import orderUpdatesPlugin from "./plugins/orderupdates";
 
 // Extend FastifyRequest to include requestTime property
 declare module "fastify" {
@@ -45,6 +45,13 @@ export class App {
       await this.initializeDatabase();
       await this.initializeRedis();
 
+      await this.app.register(websocket, {
+        options: {
+          maxPayload: 1048576, // 1MB max payload
+          clientTracking: true,
+        },
+      });
+
       await this.app.register(helmet, {
         contentSecurityPolicy: false,
       });
@@ -68,16 +75,13 @@ export class App {
         timeWindow: "1 minute", // Per minute
       });
 
-      await this.app.register(websocket, {
-        options: {
-          maxPayload: 1048576, // 1MB max payload
-        },
-      });
-
       // add decorator for redis clients
       this.app.decorate("redisClient", this.redisClient);
       this.app.decorate("redisPublisher", this.redisPublisher);
       this.app.decorate("redisSubscriber", this.redisSubscriber);
+
+      // Register order updates plugin
+      this.app.register(orderUpdatesPlugin);
 
       // Global hooks
       this.registerHooks();
@@ -105,6 +109,10 @@ export class App {
     this.redisClient = await redisConnection.initializeRedisClient();
     this.redisPublisher = await redisConnection.redisPublisher();
     this.redisSubscriber = await redisConnection.redisSubscriber();
+
+    // Initialize order worker only after Redis is ready.
+    await import("./queues/order.worker");
+    console.log("Order worker initialized");
   }
 
   // Register global hooks
@@ -114,7 +122,7 @@ export class App {
       request.requestTime = Date.now();
     });
 
-    // Response time logging
+    // Response time logging - SKIP for WebSocket
     this.app.addHook("onResponse", async (request, reply) => {
       const responseTime = Date.now() - (request.requestTime || 0);
       console.log(
@@ -135,6 +143,15 @@ export class App {
     this.app.setErrorHandler(errorHandler);
   }
 
+  private createTables = async () => {
+    try {
+      await sequelize.sync({ alter: true });
+      console.log("Tables created successfully!");
+    } catch (error) {
+      console.error("Error creating tables:", error);
+    }
+  };
+
   // Start server
   public async listen() {
     try {
@@ -145,6 +162,7 @@ export class App {
 
       console.log(`Server is running...`);
 
+      // this.createTables();
       return this.app;
     } catch (err) {
       this.app.log.error(err);
