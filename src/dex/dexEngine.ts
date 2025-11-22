@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { AppError } from "../utils/appError";
 import { ERROR_CODES } from "../utils/master.constants";
+import Redis from "ioredis";
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -25,42 +26,60 @@ const BASE_PRICE = 1.23;
  * performing slippage checks, retry logic, liquidity checks,
  * and swap execution.
  */
-export class DexEngine {
+class DexEngine {
   SLIPPAGE_PERCENT = 1; // 1%
   MAX_RETRIES = 3;
 
   // fetch quote from Raydium
-  private async getRaydiumQuote(tokenIn: string, tokenOut: string, amount: number): Promise<QuoteResult> {
+  private async getRaydiumQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amount: number
+  ): Promise<QuoteResult> {
     await sleep(200 + Math.random() * 150); // realistic latency
     return {
       dex: "raydium",
       price: BASE_PRICE * (0.98 + Math.random() * 0.04),
       fee: 0.003,
-      availableLiquidity: 100000 + Math.random() * 50000
+      availableLiquidity: 100000 + Math.random() * 50000,
     };
   }
 
   // fetch quote from Meteora
-  private async getMeteoraQuote(tokenIn: string, tokenOut: string, amount: number): Promise<QuoteResult> {
+  private async getMeteoraQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amount: number
+  ): Promise<QuoteResult> {
     await sleep(200 + Math.random() * 150);
     return {
       dex: "meteora",
       price: BASE_PRICE * (0.97 + Math.random() * 0.05),
       fee: 0.002,
-      availableLiquidity: 80000 + Math.random() * 60000
+      availableLiquidity: 80000 + Math.random() * 60000,
     };
   }
 
-   // Fetch quotes in parallel & determine the best DEX
-  async getBestQuote(tokenIn: string, tokenOut: string, amount: number): Promise<QuoteResult> {
+  // Fetch quotes in parallel & determine the best DEX
+  async getBestQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amount: number
+  ): Promise<QuoteResult> {
     const [raydium, meteora] = await Promise.all([
       this.getRaydiumQuote(tokenIn, tokenOut, amount),
       this.getMeteoraQuote(tokenIn, tokenOut, amount),
     ]);
 
     // Edge case: insufficient liquidity
-    if (raydium.availableLiquidity < amount && meteora.availableLiquidity < amount) {
-      throw new AppError(ERROR_CODES.CONFLICT,"Insufficient liquidity across all DEXs");
+    if (
+      raydium.availableLiquidity < amount &&
+      meteora.availableLiquidity < amount
+    ) {
+      throw new AppError(
+        ERROR_CODES.CONFLICT,
+        "Insufficient liquidity across all DEXs"
+      );
     }
 
     // Pick best by effective price after fee
@@ -70,9 +89,12 @@ export class DexEngine {
     return raydiumNet > meteoraNet ? raydium : meteora;
   }
 
-  
-   // EXECUTION ENGINE
-  private async executeSwap(dex: string, amount: number, expectedPrice: number): Promise<ExecutionResult> {
+  // EXECUTION ENGINE
+  private async executeSwap(
+    dex: string,
+    amount: number,
+    expectedPrice: number
+  ): Promise<ExecutionResult> {
     // Simulate 3–4 second on-chain time
     await sleep(2500 + Math.random() * 1200);
 
@@ -86,14 +108,26 @@ export class DexEngine {
     };
   }
 
+  // BUILD TRANSACTION
+  private async buildTransaction(): Promise<string> {
+    // Simulate transaction building time
+    await sleep(500 + Math.random() * 300);
+    return `tx_${randomUUID().replace(/-/g, "")}`;
+  }
 
-   // Handles the end-to-end order processing: fetching quotes, slippage checks,
-   // executing swap, retry logic, and final reporting.
-  async processOrder(orderId: string, payload: {
-    tokenIn: string;
-    tokenOut: string;
-    amount: number;
-  }) {
+  // Handles the end-to-end order processing: fetching quotes, slippage checks,
+  // executing swap, retry logic, and final reporting.
+  async processOrder(
+    orderId: string,
+    payload: {
+      tokenIn: string;
+      tokenOut: string;
+      amount: number;
+      orderId: string;
+    },
+    publisher: Redis,
+    client: Redis
+  ) {
     const { tokenIn, tokenOut, amount } = payload;
 
     let attempt = 0;
@@ -102,16 +136,54 @@ export class DexEngine {
       try {
         attempt++;
 
+        // update order status to 'routing' in cache
+        client.hset(`order:${orderId}`, { status: "routing" });
+
+        // Notify via pub/sub
+        publisher.publish(
+          "order_updates",
+          JSON.stringify({
+            orderId: orderId,
+            status: "routing",
+          })
+        );
+
         // Step 1: Fetch quotes
         const bestQuote = await this.getBestQuote(tokenIn, tokenOut, amount);
 
         // Slippage check
-        const maxAcceptablePrice = bestQuote.price * (1 + this.SLIPPAGE_PERCENT / 100);
+        const maxAcceptablePrice =
+          bestQuote.price * (1 + this.SLIPPAGE_PERCENT / 100);
 
         if (bestQuote.price > maxAcceptablePrice) {
-          throw new AppError(ERROR_CODES.NOT_ACCEPTABLE,"Slippage exceeded threshold");
+          throw new AppError(
+            ERROR_CODES.NOT_ACCEPTABLE,
+            "Slippage exceeded threshold"
+          );
         }
 
+        // Update order status to 'building' in cache
+        client.hset(`order:${orderId}`, { status: "building" });
+
+        // Notify via pub/sub
+        publisher.publish(
+          "order_updates",
+          JSON.stringify({
+            orderId: orderId,
+            status: "building",
+          })
+        );
+        await this.buildTransaction();
+
+        // Transaction sent to network
+        client.hset(`order:${orderId}`, { status: "submitted" });
+        publisher.publish(
+          "order_updates",
+          JSON.stringify({
+            orderId: orderId,
+            status: "submitted",
+          })
+        );
         // Step 2: Execute swap
         const execution = await this.executeSwap(
           bestQuote.dex,
@@ -128,9 +200,9 @@ export class DexEngine {
           txHash: execution.txHash,
           liquidityUsed: amount,
           attempt,
-          status: "success"
+          status: "success",
         };
-      } catch (err :any) {
+      } catch (err: any) {
         console.error(`Execution attempt ${attempt} failed: ${err.message}`);
 
         if (attempt >= this.MAX_RETRIES) {
@@ -148,3 +220,5 @@ export class DexEngine {
     }
   }
 }
+
+export default new DexEngine();
