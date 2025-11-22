@@ -13,10 +13,10 @@ import { routes } from './routes/index';
 import { errorHandler } from './middleware/errorHandler.middleware';
 // import { authMiddleware } from './middleware/auth.middleware';
 import { connectToDB } from './config/database.connection';
-import { connectToRedis } from './config/redis.connection';
+import { redisConnection } from "./config/redis.connection";
 
 // Extend FastifyRequest to include requestTime property
-declare module 'fastify' {
+declare module "fastify" {
   interface FastifyRequest {
     requestTime?: number;
   }
@@ -25,35 +25,26 @@ declare module 'fastify' {
 export class App {
   public app: FastifyInstance;
   public port: number;
-  public db: Pool;
-  public redis: Redis;
+  public redisClient!: Redis;
+  public redisPublisher!: Redis;
+  public redisSubscriber!: Redis;
 
   constructor() {
     // Initialize Fastify instance
     this.app = Fastify({
-    logger:false,
+      logger: false,
       bodyLimit: 52428800, // 50MB LLimit
       trustProxy: true,
     });
 
     this.port = DOT_ENV.PORT || 3000;
-    this.db = this.initializeDatabase();
-    this.redis = this.initializeRedis();
   }
-
-  // Initialize PostgreSQL connection
-  private initializeDatabase(): Pool {
-    return connectToDB();  
-}
-
-  // Initialize Redis connection
-  private initializeRedis(): Redis {
-   return connectToRedis()  
-}
-
   // Register all plugins and middleware
   public async initialize() {
     try {
+      await this.initializeDatabase();
+      await this.initializeRedis();
+
       await this.app.register(helmet, {
         contentSecurityPolicy: false,
       });
@@ -75,7 +66,6 @@ export class App {
       await this.app.register(rateLimit, {
         max: 50, // Max requests
         timeWindow: "1 minute", // Per minute
-        redis: this.redis, // Redis for distributed rate limiting
       });
 
       await this.app.register(websocket, {
@@ -84,8 +74,10 @@ export class App {
         },
       });
 
-      this.app.decorate("db", this.db);
-      this.app.decorate("redis", this.redis);
+      // add decorator for redis clients
+      this.app.decorate("redisClient", this.redisClient);
+      this.app.decorate("redisPublisher", this.redisPublisher);
+      this.app.decorate("redisSubscriber", this.redisSubscriber);
 
       // Global hooks
       this.registerHooks();
@@ -103,15 +95,27 @@ export class App {
     }
   }
 
-  // Register global hooks 
+  // Initialize PostgreSQL connection
+  private async initializeDatabase() {
+    await connectToDB();
+  }
+
+  // Initialize Redis connection
+  private async initializeRedis() {
+    this.redisClient = await redisConnection.initializeRedisClient();
+    this.redisPublisher = await redisConnection.redisPublisher();
+    this.redisSubscriber = await redisConnection.redisSubscriber();
+  }
+
+  // Register global hooks
   private registerHooks() {
     // Request logging
-    this.app.addHook('onRequest', async (request, reply) => {
+    this.app.addHook("onRequest", async (request, reply) => {
       request.requestTime = Date.now();
     });
 
     // Response time logging
-    this.app.addHook('onResponse', async (request, reply) => {
+    this.app.addHook("onResponse", async (request, reply) => {
       const responseTime = Date.now() - (request.requestTime || 0);
       console.log(
         `${request.method} ${request.url} - ${reply.statusCode} - ${responseTime}ms`
@@ -119,29 +123,28 @@ export class App {
     });
   }
 
-  // Register routes 
+  // Register routes
   private async registerRoutes() {
-    
     // Register main routes
-    await this.app.register(routes, { prefix: '/api' });
+    await this.app.register(routes, { prefix: "/api" });
   }
 
-  // Error handler 
+  // Error handler
   private registerErrorHandler() {
-    console.log('Registering custom error handler');
+    console.log("Registering custom error handler");
     this.app.setErrorHandler(errorHandler);
   }
 
-  // Start server 
+  // Start server
   public async listen() {
     try {
-      await this.app.listen({ 
-        port: this.port, 
-        host: '0.0.0.0' // Important for Docker/Railway
+      await this.app.listen({
+        port: this.port,
+        host: "0.0.0.0", // Important for Docker/Railway
       });
-      
+
       console.log(`Server is running...`);
-      
+
       return this.app;
     } catch (err) {
       this.app.log.error(err);
@@ -151,13 +154,11 @@ export class App {
 
   // Graceful shutdown
   public async close() {
-    console.log('Shutting down gracefully...');
-    
-    await this.db.end();
-    this.redis.disconnect();
+    console.log("Shutting down gracefully...");
+
     await this.app.close();
-    
-    console.log('Server closed');
+
+    console.log("Server closed");
     process.exit(0);
   }
 }
