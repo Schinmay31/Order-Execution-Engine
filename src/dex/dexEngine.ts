@@ -201,7 +201,7 @@ class DexEngine {
           txHash: execution.txHash,
           liquidityUsed: amount,
           attempt,
-          status: "success",
+          status: OrderStatus.CONFIRMED,
         };
       } catch (err: any) {
         console.error(`Execution attempt ${attempt} failed: ${err.message}`);

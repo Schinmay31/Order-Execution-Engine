@@ -1,10 +1,11 @@
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import orderService from "./order.service";
 import { validateOrderPayload } from "./order.validator";
+import { WebSocket } from "@fastify/websocket";
 
 const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // WebSocket route
-  fastify.get("/execute", { websocket: true }, (socket, req) => {
+  fastify.get("/execute", { websocket: true }, (socket:WebSocket, req) => {
     console.log(
       "New websocket connection to /execute",
       req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress

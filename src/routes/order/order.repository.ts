@@ -18,10 +18,19 @@ class orderRepo {
     return order.toJSON();
   }
 
-  static async updateStatus(data: { orderId: string; status: string }) {
-    const { orderId, status } = data;
+  static async updateStatus(data: { orderId: string; status: string; payload ?: {
+    selectedDex?: string;
+    quotedPrice?: number;
+    executedPrice?: number;
+    fee?: number;
+    txHash?: string;
+    liquidityUsed?: number;
+    dex?: string;
+  } }) {
+    const { orderId, status, payload } = data;
+    if(payload?.selectedDex) payload.dex = payload.selectedDex;
     const [rowsUpdated, [updatedOrder]] = await OrderModel.update(
-      { status },
+      { status, ...payload },
       {
         where: { id: orderId },
         returning: true,

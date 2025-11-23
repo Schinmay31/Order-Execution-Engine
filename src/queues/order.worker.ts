@@ -55,6 +55,7 @@ OrderWorker.on("completed", async (job, result) => {
   await orderRepo.updateStatus({
     orderId: job.data.orderId,
     status: OrderStatus.CONFIRMED,
+    payload: result,
   });
   publisher.publish(
     "order_updates",

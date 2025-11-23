@@ -3,6 +3,8 @@ import { orderUpdateRouter } from "../../pubsub/orderUpdateRouter";
 import { OrderQueue } from "../../queues/order.queue";
 import orderRepo from "./order.repository";
 import { OrderStatus } from "./order.constants";
+import { WebSocket } from "@fastify/websocket";
+
 
 class orderService {
   static async createOrder(
