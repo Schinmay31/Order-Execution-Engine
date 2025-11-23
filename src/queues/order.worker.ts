@@ -4,6 +4,7 @@ import DexEngine from "../dex/dexEngine";
 import { redisConnection } from "../config/redis.connection";
 import Redis from "ioredis";
 import { OrderStatus } from "../routes/order/order.constants";
+import orderRepo from "../routes/order/order.repository";
 
 let publisher: Redis;
 let client: Redis;
@@ -47,11 +48,14 @@ export const OrderWorker = new Worker(
   }
 );
 
-OrderWorker.on("completed", (job, result) => {
+OrderWorker.on("completed", async (job, result) => {
   client.hset(`order:${job.data.orderId}`, { status: OrderStatus.CONFIRMED });
 
   // make entry in order logs and order model
-
+  await orderRepo.updateStatus({
+    orderId: job.data.orderId,
+    status: OrderStatus.CONFIRMED,
+  });
   publisher.publish(
     "order_updates",
     JSON.stringify({
@@ -63,12 +67,16 @@ OrderWorker.on("completed", (job, result) => {
   console.log(`Job ${job.id} completed`);
 });
 
-OrderWorker.on("failed", (job: any, err) => {
+OrderWorker.on("failed", async (job: any, err) => {
   console.error(`Job ${job.id} failed`, err);
 
   client.hset(`order:${job.data.orderId}`, { status: OrderStatus.FAILED });
 
   // make entry in order logs and order model
+  await orderRepo.updateStatus({
+    orderId: job.data.orderId,
+    status: OrderStatus.FAILED,
+  });
 
   publisher.publish(
     "order_updates",

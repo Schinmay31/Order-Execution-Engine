@@ -16,6 +16,19 @@ class orderRepo {
 
     return order.toJSON();
   }
+
+  static async updateStatus(data: { orderId: string; status: string }) {
+    const { orderId, status } = data;
+    const [rowsUpdated, [updatedOrder]] = await OrderModel.update(
+      { status },
+      {
+        where: { id: orderId },
+        returning: true,
+      }
+    );
+    return updatedOrder.toJSON();
+  }
 }
+
 
 export default orderRepo;
