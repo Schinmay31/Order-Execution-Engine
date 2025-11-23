@@ -5,18 +5,6 @@ This project implements a **Market Order Execution Engine** with **DEX routing**
 
 We chose **Market Orders** as the primary focus because they represent the core execution flow—real-time status updates, routing logic, retries and queue orchestration without the added complexity of limit order books or on-chain monitoring. This allows for a cleaner demonstration of backend reliability and architecture.
 
- **Public URl** : https://order-execution-engine-okos.onrender.com
-
- **endpoint** : https://order-execution-engine-okos.onrender.com/api/orders/execute
- **method** : GET
- **payload** : 
-{
-    "tokenIn": "SOL",
-    "tokenOut": "USDC",
-    "amount": "1",
-    "orderType": "MARKET"
-}
-
 ---
 
 ##  High-Level Architecture
@@ -40,10 +28,38 @@ We chose **Market Orders** as the primary focus because they represent the core 
 
 ---
 
-##  Design Decision: WebSocket Flow
+ **Public URl** : https://order-execution-engine-okos.onrender.com
 
-### The Problem with POST → Upgrade
-The traditional approach of `POST /execute` followed by a WebSocket upgrade can lead to race conditions where the worker starts processing before the client has established the WebSocket connection, resulting in missed updates.
+ **endpoint** : https://order-execution-engine-okos.onrender.com/api/orders/execute
+ 
+ **method** : GET
+ 
+ **Expected payload (First message after successful ws connection)** :   
+ 
+    
+    "tokenIn": "SOL",
+    
+    "tokenOut": "USDC",
+    
+    "amount": "1",
+    
+    "orderType": "MARKET"
+
+
+---
+
+##  Design Decision: WebSocket Flow
+Assignment originally expected:
+  POST /orders/execute → returns orderId  -------  Frontend connects via WebSocket  ------- Engine starts processing
+
+ **Problems with that approach:**
+**Race Condition:**
+If the worker starts immediately, client may not have WebSocket established → missed events or inconsistent timings.
+
+**Two network calls needed**
+POST → then GET (WebSocket) — unnecessary roundtrip.
+
+**Frontend complexity increases**
 
 ###  Improved Approach
 1.  **Direct WebSocket Connection**: Client connects via `GET /api/orders/execute`.
@@ -52,7 +68,42 @@ The traditional approach of `POST /execute` followed by a WebSocket upgrade can 
 4.  **Live Streaming**: Updates are streamed from the very first state change.
 5.  **Auto-Cleanup**: Connection closes automatically upon `confirmed` or `failed` status.
 
-This ensures **zero missed messages**, lower latency and a simpler client implementation.
+### Why WebSocket-first?
+**Prevents race conditions (worker may start before WS is connected)**
+
+**Ensures no missed status updates**
+
+**Reduces unnecessary API calls**
+
+**Simpler frontend**
+
+**Ensures WS is guaranteed before processing begins**
+
+**Cleaner event-driven architecture**
+
+## Order Execution Flow : 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    participant R as Redis
+    participant Q as BullMQ
+    participant W as Worker
+    participant DB as Postgres
+
+    C->>S: Connect via WebSocket
+    C->>S: Send order payload
+    S->>DB: Create order entry
+    S->>R: Store initial state
+    S->>Q: Add job (orderId)
+    W->>R: Fetch state
+    W->>S: Publish status via Redis Pub/Sub
+    S->>C: Send WS update
+    W->>DB: Save final logs
+    S->>R: Cleanup
+    S->>C: Close WebSocket
+```
+
 
 
 ## 🛠 Setup & Deployment
@@ -67,9 +118,16 @@ This ensures **zero missed messages**, lower latency and a simpler client implem
 Create a `.env` file:
 ```env
 PORT=3000
-DATABASE_URL=postgres://user:pass@host:5432/db
+NODE_ENV=development
+DATABASE_NAME=your_db_name
+DATABASE_USERNAME=your_username
+DATABASE_PASSWORD=your_password
+DATABASE_HOST=your_db_host
+DATABASE_PORT=5432
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=false
 REDIS_URL=redis://host:6379
-DATABASE_SSL=true # if using cloud DB
+DATABASE_SSL_CA=<base64 encoded CA certificate> (optional)
 ```
 
 ### Running Locally
@@ -94,11 +152,13 @@ npm run test
 
 ### Docker
 ```cmd
-docker-compose build .
+docker-compose build
 docker-compose up
 docker-compose down
-```
 
+
+Once the Docker containers are built, the application automatically connects to your deployed PostgreSQL and Redis instances using the environment variables provided in your .env file.
+```
 ---
 
 ##  Testing Features
@@ -112,3 +172,6 @@ docker-compose down
 ##  Documentation
 
 For a deep dive into the system design, data models, and sequence flows, please see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+
+
