@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { AppError } from "../utils/appError";
 import { ERROR_CODES } from "../utils/master.constants";
 import Redis from "ioredis";
+import { OrderStatus } from "../routes/order/order.constants";
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -137,14 +138,14 @@ class DexEngine {
         attempt++;
 
         // update order status to 'routing' in cache
-        client.hset(`order:${orderId}`, { status: "routing" });
+        client.hset(`order:${orderId}`, { status: OrderStatus.ROUTING });
 
-        // Notify via pub/sub
+        // publish the updated status
         publisher.publish(
           "order_updates",
           JSON.stringify({
             orderId: orderId,
-            status: "routing",
+            status: OrderStatus.ROUTING,
           })
         );
 
@@ -163,25 +164,25 @@ class DexEngine {
         }
 
         // Update order status to 'building' in cache
-        client.hset(`order:${orderId}`, { status: "building" });
+        client.hset(`order:${orderId}`, { status: OrderStatus.BUILDING });
 
-        // Notify via pub/sub
+        // publish the updated status
         publisher.publish(
           "order_updates",
           JSON.stringify({
             orderId: orderId,
-            status: "building",
+            status: OrderStatus.BUILDING,
           })
         );
         await this.buildTransaction();
 
         // Transaction sent to network
-        client.hset(`order:${orderId}`, { status: "submitted" });
+        client.hset(`order:${orderId}`, { status: OrderStatus });
         publisher.publish(
           "order_updates",
           JSON.stringify({
             orderId: orderId,
-            status: "submitted",
+            status: OrderStatus.SUBMITTED,
           })
         );
         // Step 2: Execute swap

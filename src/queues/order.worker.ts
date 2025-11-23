@@ -3,6 +3,7 @@ import { bullRedisConnection } from "../config/bullmq.connection";
 import DexEngine from "../dex/dexEngine";
 import { redisConnection } from "../config/redis.connection";
 import Redis from "ioredis";
+import { OrderStatus } from "../routes/order/order.constants";
 
 let publisher: Redis;
 let client: Redis;
@@ -21,7 +22,7 @@ export const OrderWorker = new Worker(
     const orderKey = `order:${job.data.orderId}`;
     const orderDetails = await client.hgetall(orderKey);
 
-    // your core DEX logic
+    // core DEX logic
     const result = await DexEngine.processOrder(
       job.data.orderId,
       {
@@ -47,7 +48,7 @@ export const OrderWorker = new Worker(
 );
 
 OrderWorker.on("completed", (job, result) => {
-  client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+  client.hset(`order:${job.data.orderId}`, { status: OrderStatus.CONFIRMED });
 
   // make entry in order logs and order model
 
@@ -55,7 +56,7 @@ OrderWorker.on("completed", (job, result) => {
     "order_updates",
     JSON.stringify({
       orderId: job.data.orderId,
-      status: "confirmed",
+      status: OrderStatus.CONFIRMED,
       payload: result,
     })
   );
@@ -65,7 +66,7 @@ OrderWorker.on("completed", (job, result) => {
 OrderWorker.on("failed", (job: any, err) => {
   console.error(`Job ${job.id} failed`, err);
 
-  client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+  client.hset(`order:${job.data.orderId}`, { status: OrderStatus.FAILED });
 
   // make entry in order logs and order model
 
@@ -73,7 +74,7 @@ OrderWorker.on("failed", (job: any, err) => {
     "order_updates",
     JSON.stringify({
       orderId: job.data.orderId,
-      status: "failed",
+      status: OrderStatus.FAILED,
       payload: { error: err.message },
     })
   );

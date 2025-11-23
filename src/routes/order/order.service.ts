@@ -1,8 +1,8 @@
 import Redis from "ioredis";
 import { orderUpdateRouter } from "../../pubsub/orderUpdateRouter";
 import { OrderQueue } from "../../queues/order.queue";
-import OrderModel from "./order.model";
 import orderRepo from "./order.repository";
+import { OrderStatus } from "./order.constants";
 
 class orderService {
   static async createOrder(
@@ -35,18 +35,19 @@ class orderService {
     //  Add job to queue
     await OrderQueue.add("execute_order", { orderId });
 
-    //  Send immediate response
-
+    //  publish initial order update
     publisher.publish(
       "order_updates",
       JSON.stringify({
         orderId: orderId,
-        status: "pending",
+        status: OrderStatus.PENDING,
       })
     );
 
     return order;
   }
+
+  static async createLogs(orderId: string) {}
 }
 
 export default orderService;
