@@ -27,14 +27,18 @@ export const sequelizeInstanceCreation = () => {
         acquire: 60000,
       },
       timezone: "+05:30",
-      ssl: DATABASE_SSL,
-      dialectOptions: {
-        ssl: {
-          require: DATABASE_SSL,
-          rejectUnauthorized: DATABASE_SSL_REJECT_UNAUTHORIZED,
-          ca: [DATABASE_SSL_CA],
-        },
-      },
+      ...(DATABASE_SSL
+        ? {
+            ssl: true,
+            dialectOptions: {
+              ssl: {
+                require: true,
+                rejectUnauthorized: DATABASE_SSL_REJECT_UNAUTHORIZED,
+                ca: [DATABASE_SSL_CA],
+              },
+            },
+          }
+        : {}),
     }
   );
 };
