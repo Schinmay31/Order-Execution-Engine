@@ -65,7 +65,7 @@ OrderWorker.on("completed", async (job, result) => {
       payload: result,
     })
   );
-  console.log(`Job ${job.id} completed`);
+  console.log(`order confirmed -> ${job.data.orderId}`);
 });
 
 OrderWorker.on("failed", async (job: any, err :any) => {
@@ -87,4 +87,5 @@ OrderWorker.on("failed", async (job: any, err :any) => {
       payload: { error: err.errorList },
     })
   );
+  console.log(`order failed -> ${job.data.orderId}`);
 });

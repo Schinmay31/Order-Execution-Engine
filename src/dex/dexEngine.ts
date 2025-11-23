@@ -87,6 +87,8 @@ class DexEngine {
     const raydiumNet = raydium.price * (1 - raydium.fee);
     const meteoraNet = meteora.price * (1 - meteora.fee);
 
+    this.maybeFail(0.2, "Failed to fetch quotes from DEXs"); 
+
     return raydiumNet > meteoraNet ? raydium : meteora;
   }
 
@@ -96,11 +98,14 @@ class DexEngine {
     amount: number,
     expectedPrice: number
   ): Promise<ExecutionResult> {
-    // Simulate 3–4 second on-chain time
-    await sleep(2500 + Math.random() * 1200);
+    // Simulate 2–3 second on-chain time
+    await sleep(1500 + Math.random() * 1200);
 
     // Execution price slightly differs from quote (market movement)
     const executedPrice = expectedPrice * (0.99 + Math.random() * 0.02);
+
+   // mock failure for testing and demo
+   this.maybeFail(0.2, "Execution failed on-chain");
 
     return {
       txHash: randomUUID().replace(/-/g, ""),
@@ -113,8 +118,18 @@ class DexEngine {
   private async buildTransaction(): Promise<string> {
     // Simulate transaction building time
     await sleep(500 + Math.random() * 300);
+
+    // mock failure for testing and demo
+    this.maybeFail(0.25, "Failed to build transaction");
     return `tx_${randomUUID().replace(/-/g, "")}`;
   }
+
+  // mock failure for testing and demo
+  private maybeFail(chance = 0.3, message = "Random mock failure") {
+  if (Math.random() < chance) {
+    throw new AppError(ERROR_CODES.INTERNAL_SERVER_ERROR, message);
+  }
+}
 
   // Handles the end-to-end order processing: fetching quotes, slippage checks,
   // executing swap, retry logic, and final reporting.
@@ -148,10 +163,12 @@ class DexEngine {
             status: OrderStatus.ROUTING,
           })
         );
+        console.log(`Routing order -> ${orderId}`);
 
         // Step 1: Fetch quotes
         const bestQuote = await this.getBestQuote(tokenIn, tokenOut, amount);
 
+        console.log(`found Best quote for order -> ${orderId} -> ${JSON.stringify(bestQuote)}`);
         // Slippage check
         const maxAcceptablePrice =
           bestQuote.price * (1 + this.SLIPPAGE_PERCENT / 100);
@@ -174,6 +191,7 @@ class DexEngine {
             status: OrderStatus.BUILDING,
           })
         );
+        console.log(`Building transaction for order -> ${orderId}`);
         await this.buildTransaction();
 
         // Transaction sent to network
@@ -185,6 +203,7 @@ class DexEngine {
             status: OrderStatus.SUBMITTED,
           })
         );
+        console.log(`Executing swap for order -> ${orderId}`);
         // Step 2: Execute swap
         const execution = await this.executeSwap(
           bestQuote.dex,
