@@ -1,4 +1,5 @@
 import OrderModel from "./model/order.model";
+import { OrderLogsModel } from "./model/orderLogs.model";
 
 class orderRepo {
   static async createOrder(data: {
@@ -27,6 +28,21 @@ class orderRepo {
       }
     );
     return updatedOrder.toJSON();
+  }
+
+  static async createLog(data: {
+    orderId: string;
+    status: string;
+    metadata?: any;
+    error?: string;
+  }) {
+    const log = await OrderLogsModel.create({
+      orderId: data.orderId,
+      status: data.status,
+      metadata: data.metadata,
+      error: data.error,
+    });
+    return log.toJSON();
   }
 }
 
