@@ -3,7 +3,7 @@ import { bullRedisConnection } from "../config/bullmq.connection";
 import DexEngine from "../dex/dexEngine";
 import { redisConnection } from "../config/redis.connection";
 import Redis from "ioredis";
-import { orderUpdateRouter } from "../pubsub/orderUpdateRouter";
+import { OrderStatus } from "../routes/order/order.constants";
 
 let publisher: Redis;
 let client: Redis;
@@ -22,7 +22,7 @@ export const OrderWorker = new Worker(
     const orderKey = `order:${job.data.orderId}`;
     const orderDetails = await client.hgetall(orderKey);
 
-    // your core DEX logic
+    // core DEX logic
     const result = await DexEngine.processOrder(
       job.data.orderId,
       {
@@ -36,33 +36,45 @@ export const OrderWorker = new Worker(
     );
     return result;
   },
-  bullRedisConnection
+  {
+    ...bullRedisConnection,
+    concurrency: 10, // <= Process 10 orders in parallel
+
+    limiter: {
+      max: 100, // <= Only process 100 orders per minute
+      duration: 60_000,
+    },
+  }
 );
 
 OrderWorker.on("completed", (job, result) => {
-  console.log(`Job ${job.id} completed`);
-  client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+  client.hset(`order:${job.data.orderId}`, { status: OrderStatus.CONFIRMED });
+
+  // make entry in order logs and order model
 
   publisher.publish(
     "order_updates",
     JSON.stringify({
       orderId: job.data.orderId,
-      status: "confirmed",
+      status: OrderStatus.CONFIRMED,
       payload: result,
     })
   );
+  console.log(`Job ${job.id} completed`);
 });
 
 OrderWorker.on("failed", (job: any, err) => {
   console.error(`Job ${job.id} failed`, err);
 
-  client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+  client.hset(`order:${job.data.orderId}`, { status: OrderStatus.FAILED });
+
+  // make entry in order logs and order model
 
   publisher.publish(
     "order_updates",
     JSON.stringify({
       orderId: job.data.orderId,
-      status: "failed",
+      status: OrderStatus.FAILED,
       payload: { error: err.message },
     })
   );

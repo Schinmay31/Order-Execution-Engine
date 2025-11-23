@@ -1,8 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
-import orderRepo from "./order.repository";
-import { orderUpdateRouter } from "../../pubsub/orderUpdateRouter";
-import { OrderQueue } from "../../queues/order.queue";
 import orderService from "./order.service";
+import { validateOrderPayload } from "./order.validator";
 
 const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // WebSocket route
@@ -22,7 +20,23 @@ const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
     socket.on("message", async (raw: any) => {
       try {
-        const orderPayload = JSON.parse(raw.toString());
+        let orderPayload;
+        try {
+          // Parse incoming message
+          orderPayload = JSON.parse(raw.toString());
+        } catch (e) {
+          socket.send(JSON.stringify({ error: "Invalid JSON" }));
+          return;
+        }
+
+        // Validate payload
+        const error = validateOrderPayload(orderPayload);
+
+        if (error) {
+          socket.send(JSON.stringify({ status: "error", message: error }));
+          return;
+        }
+
         await orderService.createOrder(
           orderPayload,
           socket,
