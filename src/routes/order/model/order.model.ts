@@ -10,6 +10,7 @@ export const OrderModel = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+
     tokenIn: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -37,6 +38,31 @@ export const OrderModel = sequelize.define(
     },
 
     dex: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    quotedPrice: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    executedPrice: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    fee: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    txHash: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    liquidityUsed: {
       type: DataTypes.STRING,
       allowNull: true,
     },
