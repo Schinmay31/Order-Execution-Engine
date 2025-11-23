@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import WebSocket from "ws";
 import { orderUpdateRouter } from "../../pubsub/orderUpdateRouter";
 import { OrderQueue } from "../../queues/order.queue";
 import orderRepo from "./order.repository";

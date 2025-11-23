@@ -19,10 +19,10 @@ export const validateOrderPayload = (payload : any) => {
   }
 
   // orderType
-  const allowedOrderTypes = ["market"]; // you can add "limit", "sniper" later
+  const allowedOrderTypes = ["market"]; 
   if (!allowedOrderTypes.includes(payload.orderType)) {
     return `orderType must be one of: ${allowedOrderTypes.join(", ")}`;
   }
 
-  return null; // null means valid
+  return null; 
 }
