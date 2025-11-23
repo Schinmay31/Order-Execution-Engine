@@ -18,8 +18,6 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
 
 # Expose API port
 EXPOSE 3000
