@@ -1,25 +1,59 @@
-import { Pool } from 'pg';
-import DOT_ENV from '../config-env';
+import { Sequelize } from "sequelize";
 
-export const connectToDB = (): Pool  => {
-    const pool = new Pool({
-      connectionString: DOT_ENV.DATABASE_URL,
-      ssl: DOT_ENV.NODE_ENV === 'production' 
-        ? { rejectUnauthorized: false } 
-        : false,
-      max: 20, // Connection pool size
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+import DOT_ENV from "../config-env";
+const {
+  DATABASE_NAME,
+  DATABASE_USERNAME,
+  DATABASE_PASSWORD,
+  DATABASE_HOST,
+  DATABASE_PORT,
+  DATABASE_SSL_REJECT_UNAUTHORIZED,
+  DATABASE_SSL_CA,
+  DATABASE_SSL,
+} = DOT_ENV;
 
-    pool.on('connect', () => {
-      console.log(' PostgreSQL connected successfully');
-    });
+export const sequelizeInstanceCreation = () => {
+  return new Sequelize(
+    DATABASE_NAME as string,
+    DATABASE_USERNAME as string,
+    DATABASE_PASSWORD as string,
+    {
+      host: DATABASE_HOST,
+      logging: false,
+      dialect: "postgres",
+      port: DATABASE_PORT,
+      pool: {
+        max: 100,
+        min: 0,
+        acquire: 60000,
+      },
+      timezone: "+05:30",
+      ...(DATABASE_SSL
+        ? {
+            ssl: true,
+            dialectOptions: {
+              ssl: {
+                require: true,
+                rejectUnauthorized: DATABASE_SSL_REJECT_UNAUTHORIZED,
+                ca: [DATABASE_SSL_CA],
+              },
+            },
+          }
+        : {}),
+    }
+  );
+};
 
-    pool.on('error', (err:any) => {
-      console.error(' PostgreSQL error:', err);
-      process.exit(-1);
-    });
+const sequelize = sequelizeInstanceCreation();
 
-    return pool;
+export const connectToDB = async () => {
+  console.log("DATABASE_HOST: ", DATABASE_HOST);
+  await sequelize.authenticate();
+  if (sequelize) {
+    console.log("Database Connected Successfully");
+  } else {
+    console.log("Something Went Wrong With Database Connection.");
   }
+};
+
+export { sequelize };
