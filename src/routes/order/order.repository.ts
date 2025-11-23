@@ -1,4 +1,4 @@
-import OrderModel from "./order.model";
+import OrderModel from "./model/order.model";
 
 class orderRepo {
   static async createOrder(data: {

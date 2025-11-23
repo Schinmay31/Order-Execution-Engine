@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
-import { sequelize } from "../../config/database.connection";
+import { sequelize } from "../../../config/database.connection";
+import { OrderStatus, OrderType } from "../order.constants";
 
 export const OrderModel = sequelize.define(
   "orders",
@@ -20,7 +21,7 @@ export const OrderModel = sequelize.define(
     },
 
     orderType: {
-      type: DataTypes.ENUM("market", "limit", "sniper"),
+      type: DataTypes.ENUM(...Object.values(OrderType)),
       allowNull: false,
     },
 
@@ -30,15 +31,8 @@ export const OrderModel = sequelize.define(
     },
 
     status: {
-      type: DataTypes.ENUM(
-        "pending",
-        "routing",
-        "building",
-        "submitted",
-        "confirmed",
-        "failed"
-      ),
-      defaultValue: "pending",
+      type: DataTypes.ENUM(...Object.values(OrderStatus)),
+      defaultValue: OrderStatus.PENDING,
       allowNull: false,
     },
 

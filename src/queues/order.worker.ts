@@ -3,7 +3,6 @@ import { bullRedisConnection } from "../config/bullmq.connection";
 import DexEngine from "../dex/dexEngine";
 import { redisConnection } from "../config/redis.connection";
 import Redis from "ioredis";
-import { orderUpdateRouter } from "../pubsub/orderUpdateRouter";
 
 let publisher: Redis;
 let client: Redis;
@@ -36,12 +35,21 @@ export const OrderWorker = new Worker(
     );
     return result;
   },
-  bullRedisConnection
+  {
+    ...bullRedisConnection,
+    concurrency: 10, // <= Process 10 orders in parallel
+
+    limiter: {
+      max: 100, // <= Only process 100 orders per minute
+      duration: 60_000,
+    },
+  }
 );
 
 OrderWorker.on("completed", (job, result) => {
-  console.log(`Job ${job.id} completed`);
   client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+
+  // make entry in order logs and order model
 
   publisher.publish(
     "order_updates",
@@ -51,12 +59,15 @@ OrderWorker.on("completed", (job, result) => {
       payload: result,
     })
   );
+  console.log(`Job ${job.id} completed`);
 });
 
 OrderWorker.on("failed", (job: any, err) => {
   console.error(`Job ${job.id} failed`, err);
 
   client.hset(`order:${job.data.orderId}`, { status: "confirmed" });
+
+  // make entry in order logs and order model
 
   publisher.publish(
     "order_updates",

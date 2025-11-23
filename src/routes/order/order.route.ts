@@ -1,7 +1,4 @@
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
-import orderRepo from "./order.repository";
-import { orderUpdateRouter } from "../../pubsub/orderUpdateRouter";
-import { OrderQueue } from "../../queues/order.queue";
 import orderService from "./order.service";
 
 const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
