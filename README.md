@@ -5,6 +5,19 @@ This project implements a **Market Order Execution Engine** with **DEX routing**
 
 We chose **Market Orders** as the primary focus because they represent the core execution flow—real-time status updates, routing logic, retries and queue orchestration without the added complexity of limit order books or on-chain monitoring. This allows for a cleaner demonstration of backend reliability and architecture.
 
+# Public URl : https://order-execution-engine-okos.onrender.com
+
+# endpoint : https://order-execution-engine-okos.onrender.com/api/orders/execute
+method : GET
+
+# payload : 
+{
+    "tokenIn": "SOL",
+    "tokenOut": "USDC",
+    "amount": "1",
+    "orderType": "MARKET",
+}
+
 ---
 
 ##  High-Level Architecture
