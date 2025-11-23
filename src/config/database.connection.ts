@@ -19,6 +19,7 @@ export const sequelizeInstanceCreation = () => {
     DATABASE_PASSWORD as string,
     {
       host: DATABASE_HOST,
+      logging: false,
       dialect: "postgres",
       port: DATABASE_PORT,
       pool: {
