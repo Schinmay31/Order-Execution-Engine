@@ -177,7 +177,7 @@ class DexEngine {
         await this.buildTransaction();
 
         // Transaction sent to network
-        client.hset(`order:${orderId}`, { status: OrderStatus });
+        client.hset(`order:${orderId}`, { status: OrderStatus.SUBMITTED });
         publisher.publish(
           "order_updates",
           JSON.stringify({
@@ -206,14 +206,12 @@ class DexEngine {
       } catch (err: any) {
         console.error(`Execution attempt ${attempt} failed: ${err.message}`);
 
-        if (attempt >= this.MAX_RETRIES) {
-          return {
-            orderId,
-            status: "failed",
-            reason: err.message,
-            attempt,
-          };
-        }
+       if (attempt >= this.MAX_RETRIES) {
+         throw new AppError(
+           ERROR_CODES.BAD_REQUEST,
+           `Order failed after ${attempt} retries: ${err.errorList}`
+         );
+       }
 
         // retry delay
         await sleep(500);

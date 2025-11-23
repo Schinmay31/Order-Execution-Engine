@@ -67,7 +67,7 @@ OrderWorker.on("completed", async (job, result) => {
   console.log(`Job ${job.id} completed`);
 });
 
-OrderWorker.on("failed", async (job: any, err) => {
+OrderWorker.on("failed", async (job: any, err :any) => {
   console.error(`Job ${job.id} failed`, err);
 
   client.hset(`order:${job.data.orderId}`, { status: OrderStatus.FAILED });
@@ -83,7 +83,7 @@ OrderWorker.on("failed", async (job: any, err) => {
     JSON.stringify({
       orderId: job.data.orderId,
       status: OrderStatus.FAILED,
-      payload: { error: err.message },
+      payload: { error: err.errorList },
     })
   );
 });
