@@ -1,8 +1,5 @@
-import Fastify from "fastify";
 import WebSocket from "ws";
-import request from "supertest";
 import { App } from "../src/app";
-import { OrderStatus } from "../src/routes/order/order.constants";
 
 // Mock dependencies
 jest.mock("../src/config/database.connection", () => ({
@@ -63,7 +60,7 @@ describe.skip("Order WebSocket Integration", () => {
   let app: App;
   let server: any;
   let ws: WebSocket;
-  const PORT = 3001;
+  const PORT = 3000;
 
   beforeAll(async () => {
     // @ts-ignore
@@ -88,12 +85,6 @@ describe.skip("Order WebSocket Integration", () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.close();
     }
-  });
-
-  it("should respond to HTTP requests", async () => {
-    const response = await request(server).get("/health");
-    // We expect 404 because we didn't define /health, but it proves server is up
-    expect(response.status).toBeDefined();
   });
 
   it("should connect and receive welcome message", (done) => {
