@@ -1,4 +1,4 @@
-# 🏗 System Architecture & Design
+#  System Architecture & Design
 
 This document details the architectural decisions, data flows, and component interactions of the Order Execution Engine.
 
