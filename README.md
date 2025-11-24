@@ -3,7 +3,7 @@
 This project implements a **Market Order Execution Engine** with **DEX routing**, **BullMQ queueing**, **Redis pub/sub**, and **WebSocket live updates**. It is designed to demonstrate a robust, scalable backend architecture for real-time order processing.
 
 
-We chose **Market Orders** as the primary focus because they represent the core execution flow—real-time status updates, routing logic, retries and queue orchestration without the added complexity of limit order books or on-chain monitoring. This allows for a cleaner demonstration of backend reliability and architecture.
+We chose **Market Orders** as the primary focus because they represent the core execution flow nreal-time status updates, routing logic, retries and queue orchestration without the added complexity of limit order books or on-chain monitoring. This allows for a cleaner demonstration of backend reliability and architecture.
 
 ---
 
