@@ -105,6 +105,71 @@ sequenceDiagram
 ```
 
 
+## Extending the Engine to Support Limit & Sniper Orders 
+
+Although this project implements Market Orders, the architecture is intentionally designed so that Limit and Sniper orders can be added with minimal changes.
+All order types ultimately flow through the same execution engine, but they differ in when they are allowed to execute.
+
+### Limit Orders flow :
+
+A limit order should only execute when market price reaches the user-defined target.
+
+To support limit orders, the system can be extended using the following components:
+
+**1️. Store Limit Orders Separately (Redis) :**
+```
+Instead of immediately queueing workload like market orders, limit orders are stored in Redis with fields like:
+
+**orderId, targetPrice, tokenIn / tokenOut, amount, status = WAITING_FOR_PRICE**
+
+This prevents workers from being blocked while waiting for the market to reach the limit price.
+```
+
+**2️. Add a Price Monitoring Service :**
+```
+A lightweight service subscribes to live or periodic pricing updates.
+For each update, it:
+
+Fetches open limit orders
+
+Checks if targetPrice is reached
+
+If yes, pushes the order into the same BullMQ queue used by market orders
+
+Marks status accordingly (TRIGGERED → PENDING → ROUTING ... )
+
+This isolates condition-checking from order execution and avoids worker starvation.
+```
+
+**3️ Worker Processes It Like a Market Order**
+
+### How Sniper Orders Can Be Supported
+
+
+**A sniper order is similar to a limit order but uses more dynamic & aggressive triggers such as:**
+```
+Instant execution when price moves within X%
+
+Execute when liquidity threshold is reached
+
+Execute when first pool initializes (launch sniping)
+```
+### Sniper Order Flow :
+
+**1 . Sniper order is stored in Redis with its trigger rules**
+
+**2.Sniper Monitor Service (same service or extended variant) continuously checks:**
+```
+Price velocity
+
+Liquidity depth
+
+Launch detection
+```
+
+**3.When sniper conditions are satisfied → push to order-queue**
+
+**4.Worker executes exactly as a market order**
 
 ## 🛠 Setup & Deployment
 
