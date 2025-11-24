@@ -3,6 +3,7 @@ import { AppError } from "../utils/appError";
 import { ERROR_CODES } from "../utils/master.constants";
 import Redis from "ioredis";
 import { OrderStatus } from "../routes/order/order.constants";
+import { logInfo, logSuccess, logError, logDebug } from "../utils/logger";
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -87,7 +88,7 @@ class DexEngine {
     const raydiumNet = raydium.price * (1 - raydium.fee);
     const meteoraNet = meteora.price * (1 - meteora.fee);
 
-    this.maybeFail(0.2, "Failed to fetch quotes from DEXs"); 
+    this.maybeFail(0.2, "Failed to fetch quotes from DEXs");
 
     return raydiumNet > meteoraNet ? raydium : meteora;
   }
@@ -104,8 +105,8 @@ class DexEngine {
     // Execution price slightly differs from quote (market movement)
     const executedPrice = expectedPrice * (0.99 + Math.random() * 0.02);
 
-   // mock failure for testing and demo
-   this.maybeFail(0.2, "Execution failed on-chain");
+    // mock failure for testing and demo
+    this.maybeFail(0.2, "Execution failed on-chain");
 
     return {
       txHash: randomUUID().replace(/-/g, ""),
@@ -126,10 +127,10 @@ class DexEngine {
 
   // mock failure for testing and demo
   private maybeFail(chance = 0.3, message = "Random mock failure") {
-  if (Math.random() < chance) {
-    throw new AppError(ERROR_CODES.INTERNAL_SERVER_ERROR, message);
+    if (Math.random() < chance) {
+      throw new AppError(ERROR_CODES.INTERNAL_SERVER_ERROR, message);
+    }
   }
-}
 
   // Handles the end-to-end order processing: fetching quotes, slippage checks,
   // executing swap, retry logic, and final reporting.
@@ -163,12 +164,13 @@ class DexEngine {
             status: OrderStatus.ROUTING,
           })
         );
-        console.log(`Routing order -> ${orderId}`);
+        logInfo(`Routing order...`, orderId);
 
         // Step 1: Fetch quotes
         const bestQuote = await this.getBestQuote(tokenIn, tokenOut, amount);
 
-        console.log(`found Best quote for order -> ${orderId} -> ${JSON.stringify(bestQuote)}`);
+        logSuccess(`Found best quote for order`, orderId);
+        logDebug(`Quote details`, bestQuote, orderId);
         // Slippage check
         const maxAcceptablePrice =
           bestQuote.price * (1 + this.SLIPPAGE_PERCENT / 100);
@@ -191,7 +193,7 @@ class DexEngine {
             status: OrderStatus.BUILDING,
           })
         );
-        console.log(`Building transaction for order -> ${orderId}`);
+        logInfo(`Building transaction...`, orderId);
         await this.buildTransaction();
 
         // Transaction sent to network
@@ -203,7 +205,7 @@ class DexEngine {
             status: OrderStatus.SUBMITTED,
           })
         );
-        console.log(`Executing swap for order -> ${orderId}`);
+        logInfo(`Executing swap...`, orderId);
         // Step 2: Execute swap
         const execution = await this.executeSwap(
           bestQuote.dex,
@@ -223,14 +225,17 @@ class DexEngine {
           status: OrderStatus.CONFIRMED,
         };
       } catch (err: any) {
-        console.error(`Execution attempt ${attempt} failed: ${err.message}`);
+        logError(
+          `Execution attempt ${attempt} failed: ${err.message}`,
+          orderId
+        );
 
-       if (attempt >= this.MAX_RETRIES) {
-         throw new AppError(
-           ERROR_CODES.BAD_REQUEST,
-           `Order failed after ${attempt} retries: ${err.errorList}`
-         );
-       }
+        if (attempt >= this.MAX_RETRIES) {
+          throw new AppError(
+            ERROR_CODES.BAD_REQUEST,
+            `Order failed after ${attempt} retries: ${err.errorList}`
+          );
+        }
 
         // retry delay
         await sleep(500);

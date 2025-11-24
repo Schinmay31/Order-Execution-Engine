@@ -5,6 +5,9 @@ import { redisConnection } from "../config/redis.connection";
 import Redis from "ioredis";
 import { OrderStatus } from "../routes/order/order.constants";
 import orderRepo from "../routes/order/order.repository";
+import { logDebug, logError, logInfo, logSuccess } from "../utils/logger";
+import { AppError } from "../utils/appError";
+import { ERROR_CODES } from "../utils/master.constants";
 
 let publisher: Redis;
 let client: Redis;
@@ -17,11 +20,20 @@ let client: Redis;
 export const OrderWorker = new Worker(
   "order-queue",
   async (job) => {
-    console.log("Worker received job:", job.id);
+    logInfo(`Worker received job`, job.data.orderId);
 
     // fetch order details from Redis
     const orderKey = `order:${job.data.orderId}`;
     const orderDetails = await client.hgetall(orderKey);
+
+    if (!orderDetails || Object.keys(orderDetails).length === 0) {
+      throw new AppError(
+        ERROR_CODES.INTERNAL_SERVER_ERROR,
+        `Order details not found for ${job.data.orderId}`
+      );
+    }
+
+    logInfo(`Processing order with details`, job.data.orderId);
 
     // core DEX logic
     const result = await DexEngine.processOrder(
@@ -65,10 +77,11 @@ OrderWorker.on("completed", async (job, result) => {
       payload: result,
     })
   );
-  console.log(`order confirmed -> ${job.data.orderId}`);
+  logInfo(`order confirmed -> ${job.data.orderId}`);
+  logDebug(`order details -> ${result}`)
 });
 
-OrderWorker.on("failed", async (job: any, err :any) => {
+OrderWorker.on("failed", async (job: any, err: any) => {
   console.error(`Job ${job.id} failed`, err);
 
   client.hset(`order:${job.data.orderId}`, { status: OrderStatus.FAILED });
@@ -87,5 +100,5 @@ OrderWorker.on("failed", async (job: any, err :any) => {
       payload: { error: err.errorList },
     })
   );
-  console.log(`order failed -> ${job.data.orderId}`);
+  logError(`order failed -> ${job.data.orderId}`);
 });

@@ -4,7 +4,7 @@ import { OrderQueue } from "../../queues/order.queue";
 import orderRepo from "./order.repository";
 import { OrderStatus } from "./order.constants";
 import { WebSocket } from "@fastify/websocket";
-
+import { logInfo,logSuccess} from "../../utils/logger";
 
 class orderService {
   static async createOrder(
@@ -22,6 +22,8 @@ class orderService {
     const order = await orderRepo.createOrder(orderPayload);
     const orderId = order.id;
 
+    logInfo(`Order created`, orderId);
+
     // cache order details in Redis for quick access
     await redisClient.hmset(`order:${orderId}`, {
       tokenIn: orderPayload.tokenIn,
@@ -31,11 +33,15 @@ class orderService {
       status: "pending",
     });
 
+    logInfo(`Order cached in Redis`, orderId);
+
     //  Register this socket
     orderUpdateRouter.register(orderId, socket);
 
     //  Add job to queue
     await OrderQueue.add("execute_order", { orderId });
+
+    logInfo(`Order added to queue`, orderId);
 
     //  publish initial order update
     publisher.publish(
