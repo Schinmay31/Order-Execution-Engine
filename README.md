@@ -51,7 +51,7 @@ We chose **Market Orders** as the primary focus because they represent the core 
 ---
 
 ##  Design Decision: WebSocket Flow
-Assignment originally expected:
+ originally expected:
   POST /orders/execute → returns orderId  -------  Frontend connects via WebSocket  ------- Engine starts processing
 
  **Problems with that approach:**
@@ -106,11 +106,6 @@ sequenceDiagram
     S->>C: Close WebSocket
 ```
 
-
-## Extending the Engine to Support Limit & Sniper Orders 
-
-Although this project implements Market Orders, the architecture is intentionally designed so that Limit and Sniper orders can be added with minimal changes.
-All order types ultimately flow through the same execution engine, but they differ in when they are allowed to execute.
 
 ### Limit Orders flow :
 
